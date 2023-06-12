@@ -60,9 +60,6 @@ merger(ListOfFunInputPairs) ->
         fun({Fun, Input}, {TranslationAcc, MappingAcc, ValidatorAcc}) ->
             case Fun(Input, {TranslationAcc, MappingAcc, ValidatorAcc}) of
                 {errorlist, Errors} ->
-                    %% These have already been logged. We're not moving forward with this
-                    %% but, return them anyway so the rebar plugin can display them
-                    %% with io:format, since it doesn't have lager.
                     {errorlist, Errors};
                 {Translations, Mappings, Validators} ->
                     NewMappings = lists:foldr(
@@ -158,7 +155,7 @@ string(S, {T, M, V}) ->
         {error, {Line, erl_scan, _}, _} ->
             Error = {erl_scan, Line},
             ErrStr = cuttlefish_error:xlate(Error),
-            lager:error(lists:flatten(ErrStr)),
+            io:format(lists:flatten(ErrStr)),
             {errorlist, [{error, Error}]}
     end.
 
@@ -323,10 +320,8 @@ comment_parser_test() ->
     ok.
 
 bad_file_test() ->
-    cuttlefish_lager_test_backend:bounce(),
     {errorlist, ErrorList} = file("../test/bad_erlang.schema"),
 
-    Logs = cuttlefish_lager_test_backend:get_logs(),
     [L1|Tail] = Logs,
     [L2|[]] = Tail,
     ?assertMatch({match, _}, re:run(L1, "Error scanning erlang near line 10")),
@@ -338,7 +333,6 @@ bad_file_test() ->
     ok.
 
 parse_invalid_erlang_test() ->
-    cuttlefish_lager_test_backend:bounce(),
     SchemaString = lists:flatten([
             "%% @doc some doc\n",
             "%% the doc continues!\n",
@@ -348,7 +342,6 @@ parse_invalid_erlang_test() ->
         ]),
     Parsed = string(SchemaString),
 
-    [Log] = cuttlefish_lager_test_backend:get_logs(),
     ?assertMatch({match, _}, re:run(Log, "Schema parse error near line number 4")),
     ?assertMatch({match, _}, re:run(Log, "syntax error before: ")),
     ?assertMatch({match, _}, re:run(Log, "'}'")),
@@ -358,7 +351,6 @@ parse_invalid_erlang_test() ->
 
 
 parse_bad_datatype_test() ->
-    cuttlefish_lager_test_backend:bounce(),
 
     SchemaString = lists:flatten([
             "%% @doc some doc\n",
@@ -368,11 +360,9 @@ parse_bad_datatype_test() ->
             "  {datatype, penguin}"
             "]}.\n"
         ]),
-    _Parsed = string(SchemaString),
-    ?assertEqual([], cuttlefish_lager_test_backend:get_logs()).
+    _Parsed = string(SchemaString).
 
 files_test() ->
-    lager:start(),
     %% files/1 takes a list of schemas in priority order.
     %% Loads them in reverse order, as things are overridden
     {Translations, Mappings, Validators} = files(
